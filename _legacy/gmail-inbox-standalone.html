@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Inbox Manager</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inline Lucide React icons as SVG */
+        .icon { width: 1rem; height: 1rem; stroke: currentColor; fill: none; stroke-width: 2; }
+        .icon-lg { width: 1.5rem; height: 1.5rem; }
+        .icon-xl { width: 3rem; height: 3rem; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Simple icon components
+        const Mail = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <path d="m4 4 16 0 0 16-16 0z"/>
+                <path d="m4 4 8 8 8-8"/>
+            </svg>
+        );
+        
+        const Clock = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12,6 12,12 16,14"/>
+            </svg>
+        );
+        
+        const AlertCircle = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+        );
+        
+        const Tag = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                <line x1="7" y1="7" x2="7.01" y2="7"/>
+            </svg>
+        );
+        
+        const Play = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <polygon points="5,3 19,12 5,21"/>
+            </svg>
+        );
+        
+        const Plus = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+        );
+        
+        const X = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+        );
+        
+        const ChevronRight = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <polyline points="9,18 15,12 9,6"/>
+            </svg>
+        );
+        
+        const ArrowLeft = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <line x1="19" y1="12" x2="5" y2="12"/>
+                <polyline points="12,19 5,12 12,5"/>
+            </svg>
+        );
+        
+        const Trash2 = ({ className = "icon" }) => (
+            <svg className={className} viewBox="0 0 24 24">
+                <polyline points="3,6 5,6 21,6"/>
+                <path d="m19,6v14a2 2 0 0 1-2,2H7a2 2 0 0 1-2-2V6m3,0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2,2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+        );
+
+        const GmailInboxManager = () => {
+          const [isAuthenticated, setIsAuthenticated] = useState(false);
+          const [emails, setEmails] = useState([]);
+          const [selectedThread, setSelectedThread] = useState(null);
+          const [showCRMModal, setShowCRMModal] = useState(false);
+          const [crmForm, setCrmForm] = useState({ 
+            emailId: null, 
+            prospectName: '', 
+            company: '', 
+            email: '', 
+            timerStatus: null 
+          });
+          const [deleteConfirm, setDeleteConfirm] = useState({ 
+            show: false, 
+            emailId: null, 
+            emailSubject: '' 
+          });
+          const [showReplyBox, setShowReplyBox] = useState(false);
+          const [replyForm, setReplyForm] = useState({
+            to: '',
+            subject: '',
+            content: '',
+            type: 'reply'
+          });
+
+          // Mock email data
+          useEffect(() => {
+            const mockEmails = [
+              {
+                id: '1',
+                from: 'john.doe@example.com',
+                subject: 'Project Update - Urgent Review Needed',
+                snippet: 'Here\'s the latest update on our project. We need your feedback...',
+                date: new Date(Date.now() - 13 * 60 * 60 * 1000), // 13 hours ago
+                unread: true,
+                thread: [{
+                  id: 'm1',
+                  from: 'john.doe@example.com',
+                  to: 'you@example.com',
+                  date: new Date(Date.now() - 13 * 60 * 60 * 1000),
+                  content: 'Hi,\n\nHere\'s the latest update on our project. We\'ve completed the first phase and are moving into implementation.\n\nKey achievements:\n- Completed design phase\n- Got client approval\n- Team is ready to start development\n\nWe need your urgent review on the next steps. Please let me know your thoughts by end of day.\n\nBest regards,\nJohn'
+                }]
+              },
+              {
+                id: '2',
+                from: 'jane.smith@company.com',
+                subject: 'Meeting Tomorrow - Q4 Strategy Discussion',
+                snippet: 'Just wanted to confirm our meeting tomorrow at 2 PM...',
+                date: new Date(Date.now() - 25 * 60 * 60 * 1000), // 25 hours ago
+                unread: false,
+                thread: [{
+                  id: 'm2',
+                  from: 'jane.smith@company.com',
+                  to: 'you@example.com',
+                  date: new Date(Date.now() - 25 * 60 * 60 * 1000),
+                  content: 'Hi,\n\nJust wanted to confirm our meeting tomorrow at 2 PM. We\'ll be discussing the Q4 strategy and planning for next year.\n\nAgenda:\n1. Review Q3 performance metrics\n2. Q4 goals and targets\n3. Resource allocation for new projects\n4. Budget planning for 2024\n\nPlease come prepared with your department\'s requirements.\n\nSee you tomorrow!\n\nBest,\nJane'
+                }]
+              },
+              {
+                id: '3',
+                from: 'client@bigcorp.com',
+                subject: 'Contract Review - Action Required',
+                snippet: 'Please review the attached contract for our upcoming project...',
+                date: new Date(Date.now() - 50 * 60 * 60 * 1000), // 50 hours ago
+                unread: true,
+                thread: [{
+                  id: 'm3',
+                  from: 'client@bigcorp.com',
+                  to: 'you@example.com',
+                  date: new Date(Date.now() - 50 * 60 * 60 * 1000),
+                  content: 'Hello,\n\nI hope this email finds you well. Please review the attached contract for our upcoming project collaboration.\n\nWe need your signature by end of this week to proceed with the timeline we discussed.\n\nKey contract terms:\n- Project duration: 6 months\n- Total budget: $150,000\n- Deliverables as per our previous discussions\n- Payment terms: 30% upfront, 70% on completion\n\nPlease let me know if you have any questions or concerns about any of the terms.\n\nLooking forward to working together!\n\nBest regards,\nClient Team\nBigCorp Inc.'
+                }]
+              },
+              {
+                id: '4',
+                from: 'marketing@startup.io',
+                subject: 'Partnership Opportunity - Let\'s Connect',
+                snippet: 'We\'d love to explore a potential partnership with your company...',
+                date: new Date(Date.now() - 72 * 60 * 60 * 1000), // 72 hours ago
+                unread: true,
+                thread: [{
+                  id: 'm4',
+                  from: 'marketing@startup.io',
+                  to: 'you@example.com',
+                  date: new Date(Date.now() - 72 * 60 * 60 * 1000),
+                  content: 'Hi there,\n\nI hope you\'re having a great week! I\'m reaching out from Startup.io because we\'d love to explore a potential partnership opportunity with your company.\n\nWe\'ve been following your work and think there could be some great synergies between our platforms. Our solution helps businesses streamline their workflow automation, and we believe it could complement your existing services perfectly.\n\nWould you be open to a brief 15-minute call next week to discuss this further? I\'d be happy to work around your schedule.\n\nThank you for your time!\n\nBest,\nMarketing Team\nStartup.io'
+                }]
+              }
+            ];
+            setEmails(mockEmails);
+          }, []);
+
+          const getTimeSince = (date) => {
+            const hours = Math.floor((Date.now() - date) / (1000 * 60 * 60));
+            return hours;
+          };
+
+          const getReplyStatus = (date) => {
+            const hours = getTimeSince(date);
+            if (hours >= 48) return { text: 'Reply Urgently', color: 'text-red-600', bg: 'bg-red-100' };
+            if (hours >= 24) return { text: 'Reply Now', color: 'text-orange-600', bg: 'bg-orange-100' };
+            if (hours >= 12) return { text: 'Please Reply', color: 'text-yellow-600', bg: 'bg-yellow-100' };
+            return null;
+          };
+
+          const formatDate = (date) => {
+            const now = new Date();
+            const emailDate = new Date(date);
+            
+            if (emailDate.toDateString() === now.toDateString()) {
+              return emailDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            }
+            
+            return emailDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          };
+
+          const handleAuth = () => {
+            setIsAuthenticated(true);
+          };
+
+          const handleLogout = () => {
+            setIsAuthenticated(false);
+            setSelectedThread(null);
+          };
+
+          const pushToCRM = (emailId, e) => {
+            e.stopPropagation();
+            const email = emails.find(em => em.id === emailId);
+            const timerStatus = getReplyStatus(email.date);
+            setCrmForm({
+              emailId: emailId,
+              prospectName: '',
+              company: '',
+              email: email.from,
+              timerStatus: timerStatus
+            });
+            setShowCRMModal(true);
+          };
+
+          const addProspectToCRM = () => {
+            if (crmForm.prospectName && crmForm.company) {
+              alert(`Added ${crmForm.prospectName} from ${crmForm.company} to CRM!`);
+              setShowCRMModal(false);
+              setCrmForm({ emailId: null, prospectName: '', company: '', email: '', timerStatus: null });
+            }
+          };
+
+          const deleteEmail = (emailId, e) => {
+            e.stopPropagation();
+            const email = emails.find(em => em.id === emailId);
+            setDeleteConfirm({ 
+              show: true, 
+              emailId: emailId, 
+              emailSubject: email?.subject || '' 
+            });
+          };
+
+          const confirmDelete = () => {
+            if (deleteConfirm.emailId) {
+              setEmails(emails.filter(email => email.id !== deleteConfirm.emailId));
+              if (selectedThread && selectedThread.id === deleteConfirm.emailId) {
+                setSelectedThread(null);
+              }
+              setDeleteConfirm({ show: false, emailId: null, emailSubject: '' });
+            }
+          };
+
+          const handleReplyAction = (type) => {
+            if (!selectedThread || !selectedThread.thread || selectedThread.thread.length === 0) {
+              return;
+            }
+            
+            const lastMessage = selectedThread.thread[selectedThread.thread.length - 1];
+            setReplyForm({
+              to: lastMessage.from,
+              subject: `Re: ${selectedThread.subject}`,
+              content: '',
+              type: type
+            });
+            setShowReplyBox(true);
+          };
+
+          const sendReply = () => {
+            if (replyForm.content.trim()) {
+              alert('Reply sent successfully!');
+              setShowReplyBox(false);
+              setReplyForm({ to: '', subject: '', content: '', type: 'reply' });
+            }
+          };
+
+          if (!isAuthenticated) {
+            return (
+              <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                <div className="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+                  <div className="text-center mb-6">
+                    <Mail className="icon-xl mx-auto mb-4 text-blue-600" />
+                    <h1 className="text-2xl font-bold text-gray-800 mb-4">Gmail Inbox Manager</h1>
+                    <p className="text-gray-600">Connect your Gmail account to get started with advanced email management</p>
+                  </div>
+                  <button
+                    onClick={handleAuth}
+                    className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Connect Gmail Account
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          // Thread View
+          if (selectedThread) {
+            return (
+              <div className="min-h-screen bg-gray-50">
+                <header className="bg-white border-b border-gray-200 px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setSelectedThread(null)}
+                      className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
+                    >
+                      <ArrowLeft className="icon-lg" />
+                      Back to Inbox
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </header>
+
+                <div className="max-w-4xl mx-auto p-6">
+                  <div className="bg-white rounded-lg shadow-sm">
+                    <div className="p-6 border-b border-gray-200">
+                      <h1 className="text-2xl font-semibold mb-2">{selectedThread.subject}</h1>
+                      <div className="flex items-center gap-4">
+                        {getReplyStatus(selectedThread.date) && (
+                          <span className={`text-sm px-3 py-1 rounded-full ${getReplyStatus(selectedThread.date).bg} ${getReplyStatus(selectedThread.date).color} flex items-center gap-2`}>
+                            <Clock className="icon" />
+                            {getReplyStatus(selectedThread.date).text}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="divide-y divide-gray-200">
+                      {selectedThread.thread.map((message, index) => (
+                        <div key={message.id} className="p-6">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <div className="font-medium text-lg">{message.from}</div>
+                              <div className="text-sm text-gray-600">to {message.to}</div>
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {formatDate(message.date)}
+                            </div>
+                          </div>
+                          <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+                            {message.content}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="p-6 border-t border-gray-200">
+                      {!showReplyBox ? (
+                        <div className="flex gap-3">
+                          <button 
+                            onClick={() => handleReplyAction('reply')}
+                            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            Reply
+                          </button>
+                          <button 
+                            onClick={() => handleReplyAction('replyAll')}
+                            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                          >
+                            Reply All
+                          </button>
+                          <button 
+                            onClick={() => handleReplyAction('forward')}
+                            className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                          >
+                            Forward
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium text-gray-900">Reply</h3>
+                            <button
+                              onClick={() => setShowReplyBox(false)}
+                              className="text-gray-500 hover:text-gray-700"
+                            >
+                              <X className="icon" />
+                            </button>
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
+                            <input
+                              type="email"
+                              value={replyForm.to}
+                              onChange={(e) => setReplyForm({...replyForm, to: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Recipient email"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                            <input
+                              type="text"
+                              value={replyForm.subject}
+                              onChange={(e) => setReplyForm({...replyForm, subject: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                            <textarea
+                              value={replyForm.content}
+                              onChange={(e) => setReplyForm({...replyForm, content: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 h-40 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Type your message here..."
+                              autoFocus
+                            />
+                          </div>
+                          
+                          <div className="flex gap-3">
+                            <button
+                              onClick={sendReply}
+                              disabled={!replyForm.content.trim() || !replyForm.to}
+                              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                            >
+                              Send
+                            </button>
+                            <button
+                              onClick={() => setShowReplyBox(false)}
+                              className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // Main Inbox View
+          return (
+            <div className="min-h-screen bg-gray-50">
+              <header className="bg-white border-b border-gray-200 px-6 py-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <Mail className="icon-lg text-blue-600" />
+                    <h1 className="text-xl font-semibold text-gray-800">Gmail Inbox Manager</h1>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm text-gray-600">
+                      {emails.filter(e => e.unread).length} unread of {emails.length} emails
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                      title="Logout"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </div>
+              </header>
+
+              <div className="max-w-6xl mx-auto mt-6">
+                <div className="bg-white shadow-sm rounded-lg">
+                  <div className="divide-y divide-gray-200">
+                    {emails.map(email => {
+                      const replyStatus = getReplyStatus(email.date);
+                      
+                      return (
+                        <div
+                          key={email.id}
+                          className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${email.unread ? 'bg-blue-50 hover:bg-blue-100' : ''}`}
+                        >
+                          <div className="flex items-start">
+                            <div 
+                              className="flex-1"
+                              onClick={() => setSelectedThread(email)}
+                            >
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className={`${email.unread ? 'font-semibold' : 'font-medium'} text-gray-900 text-lg`}>
+                                  {email.from}
+                                </span>
+                                {replyStatus && (
+                                  <span className={`text-xs px-2 py-1 rounded-full ${replyStatus.bg} ${replyStatus.color} flex items-center gap-1`}>
+                                    <Clock className="w-3 h-3" />
+                                    {replyStatus.text}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`${email.unread ? 'font-semibold' : ''} text-gray-900 mb-2`}>
+                                {email.subject}
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                {email.snippet}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 ml-4">
+                              <button
+                                onClick={(e) => pushToCRM(email.id, e)}
+                                className="text-gray-400 hover:text-indigo-600 transition-colors p-2 rounded hover:bg-indigo-50"
+                                title="Push to CRM"
+                              >
+                                <ChevronRight className="icon" />
+                              </button>
+                              <div className="text-sm text-gray-500 whitespace-nowrap min-w-16">
+                                {formatDate(email.date)}
+                              </div>
+                              <button
+                                onClick={(e) => deleteEmail(email.id, e)}
+                                className="text-gray-400 hover:text-red-600 transition-colors p-2 rounded hover:bg-red-50"
+                                title="Delete email"
+                              >
+                                <Trash2 className="icon" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* CRM Modal */}
+              {showCRMModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 max-w-md w-full m-4">
+                    <h2 className="text-xl font-semibold mb-4">Add Prospect to CRM</h2>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Prospect Name
+                        </label>
+                        <input
+                          type="text"
+                          value={crmForm.prospectName}
+                          onChange={(e) => setCrmForm({...crmForm, prospectName: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="Enter prospect's full name"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Company
+                        </label>
+                        <input
+                          type="text"
+                          value={crmForm.company}
+                          onChange={(e) => setCrmForm({...crmForm, company: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="Enter company name"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={crmForm.email}
+                          readOnly
+                          className="w-full border border-gray-200 rounded-lg px-3 py-2 bg-gray-50"
+                        />
+                      </div>
+
+                      {crmForm.timerStatus && (
+                        <div className={`p-3 rounded-lg ${crmForm.timerStatus.bg}`}>
+                          <div className={`text-sm font-medium ${crmForm.timerStatus.color} flex items-center gap-2`}>
+                            <Clock className="icon" />
+                            {crmForm.timerStatus.text}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        onClick={addProspectToCRM}
+                        disabled={!crmForm.prospectName || !crmForm.company}
+                        className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        Add to CRM
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCRMModal(false);
+                          setCrmForm({ emailId: null, prospectName: '', company: '', email: '', timerStatus: null });
+                        }}
+                        className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Delete Confirmation Modal */}
+              {deleteConfirm.show && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-lg p-6 max-w-md w-full m-4">
+                    <div className="flex items-start mb-4">
+                      <div className="flex-shrink-0 bg-red-100 rounded-full p-2 mr-3">
+                        <Trash2 className="icon text-red-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">Delete Email</h3>
+                        <p className="text-gray-600 mt-1">
+                          Are you sure you want to delete this email?
+                        </p>
+                        {deleteConfirm.emailSubject && (
+                          <p className="text-sm text-gray-500 mt-2">
+                            <span className="font-medium">Subject:</span> {deleteConfirm.emailSubject}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3">
+                      <button
+                        onClick={confirmDelete}
+                        className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setDeleteConfirm({ show: false, emailId: null, emailSubject: '' })}
+                        className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+
+        ReactDOM.render(<GmailInboxManager />, document.getElementById('root'));
+    </script>
+</body>
+</html>

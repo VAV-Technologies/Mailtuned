@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Inbox Manager - Live Preview</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+        }
+        
+        .preview-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .status-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .status-card h3 {
+            color: #2563eb;
+            margin-bottom: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .status-running {
+            background: #10b981;
+            color: white;
+        }
+        
+        .status-ready {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .feature-list {
+            list-style: none;
+            margin-top: 10px;
+        }
+        
+        .feature-list li {
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .feature-list li::before {
+            content: "✅";
+            margin-right: 8px;
+        }
+        
+        .auth-section {
+            text-align: center;
+            background: white;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .auth-button {
+            background: #dc2626;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        
+        .auth-button:hover {
+            background: #b91c1c;
+        }
+        
+        .endpoints-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .endpoint {
+            font-family: 'Courier New', monospace;
+            background: #f3f4f6;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 4px 0;
+            font-size: 14px;
+        }
+        
+        .test-button {
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-size: 12px;
+        }
+        
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        
+        .success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+        }
+        
+        .error {
+            background: #fee2e2;
+            border: 1px solid #dc2626;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const API_BASE = 'http://localhost:3002';
+        
+        const PreviewApp = () => {
+            const [backendStatus, setBackendStatus] = useState('checking');
+            const [testResults, setTestResults] = useState({});
+            
+            useEffect(() => {
+                checkBackendStatus();
+            }, []);
+            
+            const checkBackendStatus = async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/health`);
+                    if (response.ok) {
+                        setBackendStatus('running');
+                    } else {
+                        setBackendStatus('error');
+                    }
+                } catch (error) {
+                    console.log('Backend connection error:', error);
+                    setBackendStatus('error');
+                }
+            };
+            
+            const testEndpoint = async (endpoint, name) => {
+                try {
+                    const response = await fetch(`${API_BASE}${endpoint}`);
+                    const data = await response.text();
+                    setTestResults(prev => ({
+                        ...prev,
+                        [name]: { success: response.ok, data: data.substring(0, 200) + '...' }
+                    }));
+                } catch (error) {
+                    setTestResults(prev => ({
+                        ...prev,
+                        [name]: { success: false, data: error.message }
+                    }));
+                }
+            };
+            
+            const startAuth = () => {
+                window.open(`${API_BASE}/auth/google`, '_blank');
+            };
+            
+            return (
+                <div className="preview-container">
+                    <div className="header">
+                        <h1>🚀 Gmail Inbox Manager - Live Preview</h1>
+                        <p>Your Gmail automation and CRM system is ready!</p>
+                    </div>
+                    
+                    <div className="status-grid">
+                        <div className="status-card">
+                            <h3>🔧 Backend Status</h3>
+                            <div className={`status-indicator ${backendStatus === 'running' ? 'status-running' : 'status-ready'}`}>
+                                {backendStatus === 'running' ? 'RUNNING CLEAN' : backendStatus === 'checking' ? 'CHECKING...' : 'ERROR'}
+                            </div>
+                            <ul className="feature-list">
+                                <li>Express Server (Port 3002)</li>
+                                <li>SQLite Database</li>
+                                <li>Reply Detection Service</li>
+                                <li>Job Queue (In-Memory Fallback)</li>
+                                <li>Error Handling Fixed</li>
+                            </ul>
+                        </div>
+                        
+                        <div className="status-card">
+                            <h3>📧 Gmail Features</h3>
+                            <div className="status-indicator status-ready">READY</div>
+                            <ul className="feature-list">
+                                <li>OAuth 2.0 Authentication</li>
+                                <li>Email Sending & Receiving</li>
+                                <li>Thread Management</li>
+                                <li>Label Management</li>
+                            </ul>
+                        </div>
+                        
+                        <div className="status-card">
+                            <h3>🤖 Automation</h3>
+                            <div className="status-indicator status-ready">READY</div>
+                            <ul className="feature-list">
+                                <li>Email Sequences</li>
+                                <li>24-Hour Timing</li>
+                                <li>Auto-Reply Detection</li>
+                                <li>Template Variables</li>
+                            </ul>
+                        </div>
+                        
+                        <div className="status-card">
+                            <h3>📊 CRM System</h3>
+                            <div className="status-indicator status-ready">READY</div>
+                            <ul className="feature-list">
+                                <li>Kanban Board</li>
+                                <li>Prospect Management</li>
+                                <li>Quality Ratings</li>
+                                <li>Notes & Tracking</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div className="auth-section">
+                        <h2>🔐 Get Started</h2>
+                        <p>Click below to authenticate with Google and start using the Gmail Inbox Manager</p>
+                        <button className="auth-button" onClick={startAuth}>
+                            🚀 Start Google Authentication
+                        </button>
+                        <p style={{marginTop: '10px', fontSize: '14px', color: '#666'}}>
+                            This will open a new tab to authorize Gmail access
+                        </p>
+                    </div>
+                    
+                    <div className="endpoints-section">
+                        <h3>🔌 API Endpoints (Live Testing)</h3>
+                        <p>Test the backend API endpoints to verify functionality:</p>
+                        
+                        <div style={{marginTop: '15px'}}>
+                            <div className="endpoint">
+                                GET /health
+                                <button className="test-button" onClick={() => testEndpoint('/health', 'health')}>
+                                    Test
+                                </button>
+                            </div>
+                            {testResults.health && (
+                                <div className={`test-result ${testResults.health.success ? 'success' : 'error'}`}>
+                                    {testResults.health.data}
+                                </div>
+                            )}
+                            
+                            <div className="endpoint">
+                                GET /auth/google
+                                <button className="test-button" onClick={() => testEndpoint('/auth/google', 'auth')}>
+                                    Test
+                                </button>
+                            </div>
+                            {testResults.auth && (
+                                <div className={`test-result ${testResults.auth.success ? 'success' : 'error'}`}>
+                                    {testResults.auth.data}
+                                </div>
+                            )}
+                            
+                            <div className="endpoint">
+                                GET /monitoring/queue
+                                <button className="test-button" onClick={() => testEndpoint('/monitoring/queue', 'queue')}>
+                                    Test
+                                </button>
+                            </div>
+                            {testResults.queue && (
+                                <div className={`test-result ${testResults.queue.success ? 'success' : 'error'}`}>
+                                    {testResults.queue.data}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div style={{marginTop: '20px', padding: '15px', background: '#f8fafc', borderRadius: '6px'}}>
+                            <h4>📋 Full Feature Access</h4>
+                            <p>After authentication, you can access:</p>
+                            <ul style={{marginTop: '10px', paddingLeft: '20px'}}>
+                                <li>Complete Gmail interface at <code>gmail-inbox-complete.html</code></li>
+                                <li>Email sequence automation</li>
+                                <li>CRM prospect management</li>
+                                <li>Template and label management</li>
+                                <li>Real-time monitoring dashboard</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+        
+        ReactDOM.render(<PreviewApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
